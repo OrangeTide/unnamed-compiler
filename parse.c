@@ -1,7 +1,21 @@
-/* parse.c - parser */
+/* parse.c - parser turns tokens into ast(abstract syntax tree). */
 /*
+ * Copyright (c) 2013 Jon Mayo <jon@rm-f.net>
  *
- * Syntax:
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+/* Syntax:
  *
  * Expr ::= Term { '+' Term }
  * Term ::= Factor { '*' Factor }
@@ -22,6 +36,18 @@
 #include "trace.h"
 
 ast_node expr(struct pstate *st); /* forward */
+
+static enum ast_op op(enum token t)
+{
+	switch (t) {
+	case T_PLUS: return O_ADD;
+	case T_MINUS: return O_SUB;
+	case T_MUL: return O_MUL;
+	case T_DIV: return O_DIV;
+	default:
+		return O_ERR;
+	}
+}
 
 ast_node number(struct pstate *st)
 {
@@ -97,7 +123,7 @@ ast_node term(struct pstate *st)
 	while (tok_cur(st) == T_MUL || tok_cur(st) == T_DIV) {
 		ast_node new = ast_node_new(st, N_2OP);
 
-		new->op = tok_cur(st);
+		new->op = op(tok_cur(st));
 		tok_next(st);
 		new->left = left;
 		new->right = factor(st);
@@ -121,7 +147,7 @@ ast_node expr(struct pstate *st)
 	while (tok_cur(st) == T_PLUS || tok_cur(st) == T_MINUS) {
 		ast_node new = ast_node_new(st, N_2OP);
 
-		new->op = tok_cur(st);
+		new->op = op(tok_cur(st));
 		tok_next(st);
 		new->left = left;
 		new->right = term(st);
@@ -130,7 +156,6 @@ ast_node expr(struct pstate *st)
 
 	return left;
 }
-
 
 ast_node parse(void)
 {
@@ -153,12 +178,28 @@ ast_node parse(void)
 }
 
 /*** MAIN ***/
+#include "gen.h"
+
+#define CODE_MAX 2048 /* maximum compiled size*/
 
 int main()
 {
+	vmcell code[CODE_MAX];
+	struct vmstate *vm;
+
+	printf("Parsing...\n");
 	ast_node root = parse();
 	ast_node_dump(root);
 	printf("\n");
+
+	printf("Compiling...\n");
+	compile(root, code, sizeof(code));
 	/* TODO: ast_node_free(root); */
+
+	printf("Running...\n");
+	vm = vm_new(code, sizeof(code));
+	vm_run(vm);
+	vm_free(vm);
+	printf("Done!\n");
 	return 0;
 }

@@ -9,6 +9,11 @@ enum ast_type {
 	N_VAR, /* T_IDENTIFIER */
 };
 
+enum ast_op {
+	O_ERR,
+	O_ADD, O_SUB, O_MUL, O_DIV,
+};
+
 /* TODO: make this structure opaque. */
 struct ast_node {
 	enum ast_type type;
@@ -16,7 +21,7 @@ struct ast_node {
 	union {
 		struct {
 			ast_node right; /* N_2OP */
-			int op;
+			enum ast_op op;
 		};
 		long num; /* N_NUM */
 		char *id; /* N_VAR */

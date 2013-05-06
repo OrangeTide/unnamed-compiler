@@ -1,10 +1,25 @@
+/* vm.c : virtual machine executes a list of instructions. */
+/*
+ * Copyright (c) 2013 Jon Mayo <jon@rm-f.net>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <stdlib.h>
+#include <stdio.h>
 
-enum vmop {
-	HALT, IFETCH, ISTORE, IPUSH, IPOP, IADD, ISUB, ILT, JZ, JNZ, JMP,
-};
-
-typedef unsigned vmcell;
+#include "trace.h"
+#include "vm.h"
 
 struct vmstate {
 	vmcell pc;
@@ -62,11 +77,18 @@ void vm_free(struct vmstate *vm)
 
 int vm_run(struct vmstate *vm)
 {
+	TRACE;
 	while (1) {
-		if (vm->pc >= vm->code_len)
+		TRACE_FMT("pc:%04x\n", vm->pc);
+		if (vm->pc >= vm->code_len) {
+			fprintf(stderr, "VM jumped out of bounds\n");
 			return -1;
+		}
+		TRACE_FMT("\t\t%02X\n", vm->code[vm->pc]);
 		switch (vm_next(vm)) {
 		case HALT:
+			// TODO: check for stack overflow
+			printf("result = %d\n", vm->stack[vm->sp - 1]);
 			return 0;
 		case IFETCH:
 			vm_push(vm, vm_global(vm, vm_pcdata_next(vm)));
@@ -86,11 +108,25 @@ int vm_run(struct vmstate *vm)
 			break;
 		case ISUB:
 			vm->sp--;
-			vm->stack[vm->sp - 1] += vm->stack[vm->sp];
+			vm->stack[vm->sp - 1] -= vm->stack[vm->sp];
 			break;
+		case UMUL:
+			vm->sp--;
+			vm->stack[vm->sp - 1] *= vm->stack[vm->sp];
+			break;
+		case UDIV: {
+			vmcell d; // if this ever becomes signed division, handle negative overflow
+			vm->sp--;
+			d = vm->stack[vm->sp];
+			if (d)
+				vm->stack[vm->sp - 1] /= d;
+			// TODO: else throw an exception
+			break;
+		}
 		case ILT:
 			vm->sp--;
-			vm->stack[vm->sp - 1] =	vm->stack[vm->sp - 1] < vm->stack[vm->sp];
+			vm->stack[vm->sp - 1] =
+				vm->stack[vm->sp - 1] < vm->stack[vm->sp];
 			break;
 		case JZ: {
 			vmcell ofs = vm_pcdata_next(vm);
