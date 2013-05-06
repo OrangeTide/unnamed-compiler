@@ -1,4 +1,4 @@
-/* parse.c - parser turns tokens into ast(abstract syntax tree). */
+/* parse.c : parser turns tokens into ast(abstract syntax tree). */
 /*
  * Copyright (c) 2013 Jon Mayo <jon@rm-f.net>
  *
@@ -19,12 +19,13 @@
  *
  * Expr ::= Term { '+' Term }
  * Term ::= Factor { '*' Factor }
- * Factor ::= identifier | number | "(" Expr ")"
+ * ExprParen ::= "(" Expr ")"
+ * Factor ::= identifier | number | ExprParen
  * number ::= [0-9]+
  * identifier ::= [A-Za-z_][A-Za-z0-9_]*
  *
  * Future:
- * assignStmt := lvalue = expr
+ * assignStmt := identifier '=' ExprParen
  */
 #include <assert.h>
 #include <stdio.h>
@@ -175,31 +176,4 @@ ast_node parse(void)
 
 	pstate_free(st);
 	return root;
-}
-
-/*** MAIN ***/
-#include "gen.h"
-
-#define CODE_MAX 2048 /* maximum compiled size*/
-
-int main()
-{
-	vmcell code[CODE_MAX];
-	struct vmstate *vm;
-
-	printf("Parsing...\n");
-	ast_node root = parse();
-	ast_node_dump(root);
-	printf("\n");
-
-	printf("Compiling...\n");
-	compile(root, code, sizeof(code));
-	/* TODO: ast_node_free(root); */
-
-	printf("Running...\n");
-	vm = vm_new(code, sizeof(code));
-	vm_run(vm);
-	vm_free(vm);
-	printf("Done!\n");
-	return 0;
 }

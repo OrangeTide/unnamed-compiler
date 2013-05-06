@@ -1,4 +1,4 @@
-/* ast.c : operations on the abstract syntax tree. */
+/* lang.c : the main function for the language. */
 /*
  * Copyright (c) 2013 Jon Mayo <jon@rm-f.net>
  *
@@ -15,53 +15,30 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdlib.h>
 #include <stdio.h>
 
-#include "ast.h"
-#include "tok.h"
+#include "gen.h"
 
-ast_node ast_node_new(struct pstate *st, enum ast_type type)
+#define CODE_MAX 2048 /* maximum compiled size */
+
+int main()
 {
-	ast_node n;
-	n = calloc(1, sizeof(*n));
-	n->type = type;
-	n->op = ~0;
-	n->line = line_cur(st);
-	return n;
-}
+	vmcell code[CODE_MAX];
+	struct vmstate *vm;
 
-static const char *opname(enum ast_op op)
-{
-	switch (op) {
-	case O_ADD: return "+";
-	case O_SUB: return "-";
-	case O_MUL: return "*";
-	case O_DIV: return "/";
-	case O_ERR: ;
-	}
-	return "UNKNOWN";
-}
+	printf("Parsing...\n");
+	ast_node root = parse();
+	ast_node_dump(root);
+	printf("\n");
 
-void ast_node_dump(const ast_node n)
-{
-	if (!n)
-		return;
+	printf("Compiling...\n");
+	compile(root, code, sizeof(code));
+	/* TODO: ast_node_free(root); */
 
-	switch (n->type) {
-	case N_2OP:
-		printf(" (%s", opname(n->op));
-		ast_node_dump(n->left);
-		ast_node_dump(n->right);
-		printf(")");
-		return;
-	case N_NUM:
-		printf(" %ld", n->num);
-		return;
-	case N_VAR:
-		printf(" %s", n->id);
-		return;
-	}
-
-	printf("ERROR\n");
+	printf("Running...\n");
+	vm = vm_new(code, sizeof(code));
+	vm_run(vm);
+	vm_free(vm);
+	printf("Done!\n");
+	return 0;
 }
