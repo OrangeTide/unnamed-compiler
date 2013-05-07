@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 
 #include "tok.h"
@@ -104,6 +105,60 @@ void discard_whitespace(struct pstate *st)
 		ch_next(st);
 }
 
+/* number ::= [0-9]+ */
+void parse_number(struct pstate *st)
+{
+	int ch = ch_cur(st);
+
+	st->tok = T_NUMBER;
+	st->num_buf = 0;
+	while (isdigit(ch)) {
+		st->num_buf = (st->num_buf * 10) + (ch - '0');
+		ch_next(st);
+		ch = ch_cur(st);
+	}
+	TRACE_FMT("T_NUMBER=%ld\n", st->num_buf);
+}
+
+/* identifier or a keyword ("if", "then", "else", etc)
+ * identifier ::= [A-Za-z_][A-Za-z0-9_]*
+ */
+void parse_identifier(struct pstate *st)
+{
+	unsigned cnt;
+	int ch = ch_cur(st);
+
+	cnt = 0;
+	while (isalnum(ch) || ch == '_') {
+		if (cnt > sizeof(st->id_buf) - 1) {
+			error(st, "identifier too long");
+			st->id_buf[0] = 0;
+			return;
+		}
+		st->id_buf[cnt] = ch;
+		cnt++;
+		ch_next(st);
+		ch = ch_cur(st);
+	}
+	st->id_buf[cnt] = 0;
+	if (!strcmp(st->id_buf, "if")) {
+		TRACE_FMT("T_IF\n");
+		st->tok = T_IF;
+		st->id_buf[0] = 0;
+	} else if (!strcmp(st->id_buf, "then")) {
+		TRACE_FMT("T_THEN\n");
+		st->tok = T_THEN;
+		st->id_buf[0] = 0;
+	} else if (!strcmp(st->id_buf, "else")) {
+		TRACE_FMT("T_ELSE\n");
+		st->tok = T_ELSE;
+		st->id_buf[0] = 0;
+	} else {
+		TRACE_FMT("T_IDENTIFIER\n");
+		st->tok = T_IDENTIFIER;
+	}
+}
+
 void tok_next(struct pstate *st)
 {
 	char ch;
@@ -113,32 +168,10 @@ void tok_next(struct pstate *st)
 	ch = ch_cur(st);
 	if (ch == EOF) {
 		st->tok = T_EOF;
-	} else if (isdigit(ch)) { /* number ::= [0-9]+ */
-		st->tok = T_NUMBER;
-		st->num_buf = 0;
-		while (isdigit(ch)) {
-			st->num_buf = (st->num_buf * 10) + (ch - '0');
-			ch_next(st);
-			ch = ch_cur(st);
-		}
-		TRACE_FMT("T_NUMBER=%ld\n", st->num_buf);
-	} else if (isalpha(ch) || ch == '_') { /* identifier ::= [A-Za-z_][A-Za-z0-9_]* */
-		unsigned cnt;
-
-		cnt = 0;
-		while (isalnum(ch) || ch == '_') {
-			if (cnt > sizeof(st->id_buf) - 1) {
-				error(st, "identifier too long");
-				st->id_buf[0] = 0;
-				return;
-			}
-			st->id_buf[cnt] = ch;
-			cnt++;
-			ch_next(st);
-			ch = ch_cur(st);
-		}
-		st->id_buf[cnt] = 0;
-		st->tok = T_IDENTIFIER;
+	} else if (isdigit(ch)) {
+		parse_number(st);
+	} else if (isalpha(ch) || ch == '_') {
+		parse_identifier(st);
 	} else if (ch == '+') {
 		st->tok = T_PLUS;
 		ch_next(st); // TODO: move all these ch_next()'s up

@@ -21,6 +21,7 @@
 #include "trace.h"
 #include "vm.h"
 
+
 struct vmstate {
 	vmcell pc;
 	vmcell sp;
@@ -32,6 +33,7 @@ struct vmstate {
 
 static enum vmop vm_next(struct vmstate *vm)
 {
+	TRACE_FMT("pc:%04x\n", vm->pc);
 	return vm->code[vm->pc++];
 }
 
@@ -52,11 +54,13 @@ static void vm_global_set(struct vmstate *vm, unsigned i, vmcell v)
 
 static void vm_push(struct vmstate *vm, vmcell v)
 {
+	TRACE_FMT("IPUSH %02x\n", v);
 	vm->stack[vm->sp++] = v;
 }
 
 static vmcell vm_pop(struct vmstate *vm)
 {
+	TRACE_FMT("IPOP --- %02x\n", vm->stack[vm->sp - 1]);
 	return vm->stack[--vm->sp];
 }
 
@@ -79,7 +83,6 @@ int vm_run(struct vmstate *vm)
 {
 	TRACE;
 	while (1) {
-		TRACE_FMT("pc:%04x\n", vm->pc);
 		if (vm->pc >= vm->code_len) {
 			fprintf(stderr, "VM jumped out of bounds\n");
 			return -1;
@@ -123,28 +126,48 @@ int vm_run(struct vmstate *vm)
 			// TODO: else throw an exception
 			break;
 		}
-		case ILT:
+		case ILT: /* Less than */
 			vm->sp--;
 			vm->stack[vm->sp - 1] =
 				vm->stack[vm->sp - 1] < vm->stack[vm->sp];
 			break;
-		case JZ: {
-			vmcell ofs = vm_pcdata_next(vm);
-
-			if (!vm_pop(vm))
-				vm->pc = ofs;
-			}
-			break;
-		case JNZ: {
-			vmcell ofs = vm_pcdata_next(vm);
-
-			if (vm_pop(vm))
+		case JZ: { /* Jump if zero */
+			vmcell ofs = vm_pcdata_next(vm) - 1;
+			TRACE_FMT("JZ %+d\n", ofs);
+			if (!vm_pop(vm)) {
 				vm->pc += ofs;
+				TRACE_FMT("\tjump to PC=%04x\n", vm->pc);
 			}
-			break;
-		case JMP: /* relative jump */
-			vm->pc += vm_pcdata_next(vm);
 			break;
 		}
+		case JNZ: { /* Jump if not zero */
+			vmcell ofs = vm_pcdata_next(vm) - 1;
+
+			TRACE_FMT("JNZ %+d\n", ofs);
+			if (vm_pop(vm)) {
+				vm->pc += ofs;
+				TRACE_FMT("\tjump to PC=%04x\n", vm->pc);
+			}
+			break;
+		}
+		case JMP: { /* relative jump */
+			vmcell ofs = vm_pcdata_next(vm) - 1;
+
+			TRACE_FMT("JMP %+d\n", ofs);
+			vm->pc += ofs;
+			TRACE_FMT("\tjump to PC=%04x\n", vm->pc);
+			break;
+		}
+		}
+	}
+}
+
+void vm_dump(struct vmstate *vm)
+{
+	unsigned i;
+
+	printf("code_len=%d\n", vm->code_len);
+	for (i = 0; i < vm->code_len; i++) {
+		printf("%04x %02x\n", i, vm->code[i]);
 	}
 }

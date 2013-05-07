@@ -61,7 +61,38 @@ void ast_node_dump(const ast_node n)
 	case N_VAR:
 		printf(" %s", n->id);
 		return;
+	case N_COND:
+		printf(" (if");
+		ast_node_dump(n->left); /* condition */
+		ast_node_dump(n->arg[0]); /* true case */
+		ast_node_dump(n->arg[1]); /* false case */
+		printf(")");
+		return;
 	}
 
 	printf("ERROR\n");
+}
+
+void ast_node_free(ast_node n)
+{
+	if (!n)
+		return;
+	switch (n->type) {
+	case N_2OP:
+		ast_node_free(n->left);
+		ast_node_free(n->right);
+		break;
+	case N_NUM:
+		break;
+	case N_VAR:
+		free(n->id);
+		n->id = NULL;
+		break;
+	case N_COND:
+		ast_node_free(n->left);
+		ast_node_free(n->arg[0]);
+		ast_node_free(n->arg[1]);
+		break;
+	}
+	free(n);
 }

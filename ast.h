@@ -7,6 +7,7 @@ enum ast_type {
 	N_2OP, /* T_PLUS, T_MINUS, T_MUL, T_DIV */
 	N_NUM, /* T_NUMBER */
 	N_VAR, /* T_IDENTIFIER */
+	N_COND, /* T_IF c T_THEN t T_ELSE f */
 };
 
 enum ast_op {
@@ -25,6 +26,7 @@ struct ast_node {
 		};
 		long num; /* N_NUM */
 		char *id; /* N_VAR */
+		ast_node arg[2]; /* N_COND */
 	};
 	/* useful for error reporting during compile stage */
 	unsigned line;
@@ -32,4 +34,5 @@ struct ast_node {
 
 ast_node ast_node_new(struct pstate *st, enum ast_type type);
 void ast_node_dump(const ast_node n);
+void ast_node_free(ast_node n);
 #endif

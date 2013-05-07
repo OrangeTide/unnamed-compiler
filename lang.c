@@ -17,6 +17,8 @@
 
 #include <stdio.h>
 
+#include "ast.h"
+#include "parse.h"
 #include "gen.h"
 
 #define CODE_MAX 2048 /* maximum compiled size */
@@ -24,21 +26,36 @@
 int main()
 {
 	vmcell code[CODE_MAX];
-	struct vmstate *vm;
+	unsigned code_len = CODE_MAX;
+	ast_node root;
 
 	printf("Parsing...\n");
-	ast_node root = parse();
+	root = parse();
+	if (!root) {
+		fprintf(stderr, "PARSE ERROR!\n");
+		return 1;
+	}
 	ast_node_dump(root);
 	printf("\n");
 
 	printf("Compiling...\n");
-	compile(root, code, sizeof(code));
-	/* TODO: ast_node_free(root); */
 
+	if (!compile(root, code, &code_len)) {
+		fprintf(stderr, "COMPILE ERROR!\n");
+		ast_node_free(root);
+		return 1;
+	}
+
+	struct vmstate *vm;
+	ast_node_free(root);
 	printf("Running...\n");
-	vm = vm_new(code, sizeof(code));
+	vm = vm_new(code, code_len);
+#ifndef NDEBUG
+	vm_dump(vm);
+#endif
 	vm_run(vm);
 	vm_free(vm);
 	printf("Done!\n");
+
 	return 0;
 }

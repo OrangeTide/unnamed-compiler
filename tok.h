@@ -8,6 +8,7 @@ enum token {
 	T_NUMBER,
 	T_PLUS, T_MINUS, T_MUL, T_DIV,
 	T_LEFT_PAREN, T_RIGHT_PAREN,
+	T_IF, T_THEN, T_ELSE,
 };
 
 void error(struct pstate *st, const char *reason);
